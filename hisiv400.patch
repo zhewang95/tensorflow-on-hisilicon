@@ -1,0 +1,847 @@
+diff --git a/CONTRIBUTING.md b/CONTRIBUTING.md
+index 8669c25..b2ab52a 100644
+--- a/CONTRIBUTING.md
++++ b/CONTRIBUTING.md
+@@ -163,7 +163,7 @@ There are two ways to run TensorFlow unit tests.
+    the `cuda` option flag
+ 
+    ```bash
+-   export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/local/cuda/lib64:/usr/local/cuda/extras/CUPTI/lib64:$LD_LIBRARY_PATH"
++   export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/local/cuda/lib:/usr/local/cuda/extras/CUPTI/lib:$LD_LIBRARY_PATH"
+ 
+    export flags="--config=opt --config=cuda -k"
+    ```
+diff --git a/WORKSPACE b/WORKSPACE
+index 4ddfb9a..4a13351 100644
+--- a/WORKSPACE
++++ b/WORKSPACE
+@@ -46,6 +46,12 @@ load("//tensorflow:workspace.bzl", "tf_workspace")
+ # Please add all new TensorFlow dependencies in workspace.bzl.
+ tf_workspace()
+ 
++new_local_repository(
++    name='local_arm_compiler',
++    path='/opt/hisi-linux/x86-arm/arm-hisiv400-linux',
++    build_file = 'local_arm_compiler/BUILD.local_arm_compiler'
++)
++
+ new_http_archive(
+     name = "inception_v1",
+     build_file = "models.BUILD",
+diff --git a/configure.py b/configure.py
+index 96caa2e..0d34288 100644
+--- a/configure.py
++++ b/configure.py
+@@ -869,7 +869,7 @@ def set_tf_cuda_version(environ_cp):
+     if is_windows():
+       cuda_rt_lib_path = 'lib/x64/cudart.lib'
+     elif is_linux():
+-      cuda_rt_lib_path = 'lib64/libcudart.so.%s' % tf_cuda_version
++      cuda_rt_lib_path = 'lib/libcudart.so.%s' % tf_cuda_version
+     elif is_macos():
+       cuda_rt_lib_path = 'lib/libcudart.%s.dylib' % tf_cuda_version
+ 
+@@ -925,7 +925,7 @@ def set_tf_cudnn_version(environ_cp):
+       cuda_dnn_lib_path = 'lib/x64/cudnn.lib'
+       cuda_dnn_lib_alt_path = 'lib/x64/cudnn.lib'
+     elif is_linux():
+-      cuda_dnn_lib_path = 'lib64/libcudnn.so.%s' % tf_cudnn_version
++      cuda_dnn_lib_path = 'lib/libcudnn.so.%s' % tf_cudnn_version
+       cuda_dnn_lib_alt_path = 'libcudnn.so.%s' % tf_cudnn_version
+     elif is_macos():
+       cuda_dnn_lib_path = 'lib/libcudnn.%s.dylib' % tf_cudnn_version
+@@ -1016,7 +1016,7 @@ def set_tf_tensorrt_install_path(environ_cp):
+ 
+     possible_files = find_libs(trt_install_path)
+     possible_files.update(find_libs(os.path.join(trt_install_path, 'lib')))
+-    possible_files.update(find_libs(os.path.join(trt_install_path, 'lib64')))
++    possible_files.update(find_libs(os.path.join(trt_install_path, 'lib')))
+ 
+     def is_compatible(tensorrt_lib, cuda_ver, cudnn_ver):
+       """Check the compatibility between tensorrt and cudnn/cudart libraries."""
+@@ -1075,7 +1075,7 @@ def set_tf_tensorrt_install_path(environ_cp):
+             'are not compatible with selected cuda and cudnn installations')
+       print(trt_install_path)
+       print(os.path.join(trt_install_path, 'lib'))
+-      print(os.path.join(trt_install_path, 'lib64'))
++      print(os.path.join(trt_install_path, 'lib'))
+       if search_result:
+         print(libnvinfer_path_from_ldconfig)
+     else:
+@@ -1083,7 +1083,7 @@ def set_tf_tensorrt_install_path(environ_cp):
+           'Invalid path to TensorRT. None of the following files can be found:')
+       print(trt_install_path)
+       print(os.path.join(trt_install_path, 'lib'))
+-      print(os.path.join(trt_install_path, 'lib64'))
++      print(os.path.join(trt_install_path, 'lib'))
+       if search_result:
+         print(libnvinfer_path_from_ldconfig)
+ 
+diff --git a/tensorflow/contrib/cmake/CMakeLists.txt b/tensorflow/contrib/cmake/CMakeLists.txt
+index 0708d6b..c364ce9 100644
+--- a/tensorflow/contrib/cmake/CMakeLists.txt
++++ b/tensorflow/contrib/cmake/CMakeLists.txt
+@@ -57,7 +57,7 @@ if (NOT WIN32)
+   find_package (Threads)
+ 
+   # Options for linking CUDA/CUDNN libraries
+-  option(tensorflow_PATH_STATIC_LIB "Additional library search path for libcudnn_static.a, libnccl_static.a, libculibos.a" /usr/local/cuda/lib64/)
++  option(tensorflow_PATH_STATIC_LIB "Additional library search path for libcudnn_static.a, libnccl_static.a, libculibos.a" /usr/local/cuda/lib/)
+   option(tensorflow_CUDNN_INCLUDE "cudnn.h header install path" /usr/include/)
+   if (NOT tensorflow_CUDNN_INCLUDE)
+     # option's default value is OFF. Fill it with real default values
+@@ -73,10 +73,10 @@ if (NOT WIN32)
+     # option's default value is OFF. Fill it with real default values
+     set (tensorflow_PATH_NCCL_STATIC_LIB ${tensorflow_PATH_STATIC_LIB})
+   endif (NOT tensorflow_PATH_NCCL_STATIC_LIB)
+-  option(tensorflow_CUDA_LIBRARY_PATH "Designate the default CUDA library paths" /usr/local/cuda/lib64)
++  option(tensorflow_CUDA_LIBRARY_PATH "Designate the default CUDA library paths" /usr/local/cuda/lib)
+   if (NOT tensorflow_CUDA_LIBRARY_PATH)
+     # option's default value is OFF. Fill it with real default values
+-    set(tensorflow_CUDA_LIBRARY_PATH /usr/local/cuda/lib64)
++    set(tensorflow_CUDA_LIBRARY_PATH /usr/local/cuda/lib)
+   endif (NOT tensorflow_CUDA_LIBRARY_PATH)
+ 
+   # Options for linking other libraries
+@@ -422,7 +422,7 @@ if (tensorflow_ENABLE_GPU)
+       message(FATAL_ERROR "NCCL is required for GPU-build")
+     else (NOT nccl_STATIC_LIBRARY)
+       message("nccl-static: ${nccl_STATIC_LIBRARY}")
+-      # something like /usr/lib64/libnccl_static.a
++      # something like /usr/lib/libnccl_static.a
+     endif (NOT nccl_STATIC_LIBRARY)
+ 
+     find_library(cudnn_STATIC_LIBRARY NAMES libcudnn_static.a PATHS ${tensorflow_PATH_CUDNN_STATIC_LIB} ${CUDA_TOOLKIT_ROOT_DIR})
+diff --git a/tensorflow/contrib/makefile/Makefile b/tensorflow/contrib/makefile/Makefile
+index 1a1ab54..ccea9c6 100644
+--- a/tensorflow/contrib/makefile/Makefile
++++ b/tensorflow/contrib/makefile/Makefile
+@@ -433,9 +433,9 @@ $(MARCH_OPTION) \
+ 		TEGRA_LIBS := \
+ -L$(JETPACK)/cuda/targets/aarch64-linux-androideabi/lib \
+ -L$(JETPACK)/cuda/targets/aarch64-linux-androideabi/lib/stubs \
+--L$(JETPACK)/cuda/targets/aarch64-linux-androideabi/lib64 \
+--L$(JETPACK)/cuda/targets/aarch64-linux-androideabi/lib64/stubs \
+--L$(JETPACK)/cuDNN/aarch64/cuda/lib64 \
++-L$(JETPACK)/cuda/targets/aarch64-linux-androideabi/lib \
++-L$(JETPACK)/cuda/targets/aarch64-linux-androideabi/lib/stubs \
++-L$(JETPACK)/cuDNN/aarch64/cuda/lib \
+ -L$(LIBDIR)
+ 
+ 		CUDA_LIB_DEPS := $(LIBDIR)libtfcuda.a
+diff --git a/tensorflow/contrib/makefile/README.md b/tensorflow/contrib/makefile/README.md
+index 6c3b02e..159cf57 100644
+--- a/tensorflow/contrib/makefile/README.md
++++ b/tensorflow/contrib/makefile/README.md
+@@ -142,7 +142,7 @@ First, download and install JetPack for Android version 3.2 or greater from [Nvi
+ git clone https://github.com/tensorflow/tensorflow.git
+ cd tensorflow
+ JETPACK=$HOME/JetPack_Android_3.2
+-TEGRA_LIBS="$JETPACK/cuDNN/aarch64/cuda/lib64/libcudnn.so  $JETPACK/cuda-9.0/extras/CUPTI/lib64/libcupti.so $JETPACK/cuda/targets/aarch64-linux-androideabi/lib64/libcufft.so"
++TEGRA_LIBS="$JETPACK/cuDNN/aarch64/cuda/lib/libcudnn.so  $JETPACK/cuda-9.0/extras/CUPTI/lib/libcupti.so $JETPACK/cuda/targets/aarch64-linux-androideabi/lib/libcufft.so"
+ ```
+ 
+ #### Building all CUDA-enabled native binaries:
+@@ -159,13 +159,13 @@ CC_PREFIX=ccache tensorflow/contrib/makefile/build_all_android.sh -s tensorflow/
+ Build binaries first as above, then run:
+ 
+ ```bash
+-adb shell mkdir -p /data/local/tmp/lib64
+-adb push $TEGRA_LIBS /data/local/tmp/lib64
++adb shell mkdir -p /data/local/tmp/lib
++adb push $TEGRA_LIBS /data/local/tmp/lib
+ adb push tensorflow/contrib/makefile/gen/bin/android_arm64-v8a/benchmark /data/local/tmp
+ wget  https://ci.tensorflow.org/view/Nightly/job/nightly-android/lastSuccessfulBuild/artifact/out/tensorflow_demo.apk
+ unzip tensorflow_demo.apk -d /tmp/tensorflow_demo
+ adb push /tmp/tensorflow_demo/assets/*.pb /data/local/tmp
+-adb shell "LD_LIBRARY_PATH=/data/local/tmp/lib64 /data/local/tmp/benchmark --graph=/data/local/tmp/tensorflow_inception_graph.pb"
++adb shell "LD_LIBRARY_PATH=/data/local/tmp/lib /data/local/tmp/benchmark --graph=/data/local/tmp/tensorflow_inception_graph.pb"
+ ```
+ 
+ #### Building the CUDA-enabled TensorFlow AAR with Bazel:
+diff --git a/tensorflow/core/grappler/clusters/utils.cc b/tensorflow/core/grappler/clusters/utils.cc
+index a751972..9d2897a 100644
+--- a/tensorflow/core/grappler/clusters/utils.cc
++++ b/tensorflow/core/grappler/clusters/utils.cc
+@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
+ limitations under the License.
+ ==============================================================================*/
+ 
++# define INT64_MAX              (__INT64_C(9223372036854775807))
++
+ #include "tensorflow/core/grappler/clusters/utils.h"
+ 
+ #include "third_party/eigen3/Eigen/Core"
+diff --git a/tensorflow/core/lib/io/record_reader.h b/tensorflow/core/lib/io/record_reader.h
+index f6d587d..719b081 100644
+--- a/tensorflow/core/lib/io/record_reader.h
++++ b/tensorflow/core/lib/io/record_reader.h
+@@ -16,6 +16,12 @@ limitations under the License.
+ #ifndef TENSORFLOW_LIB_IO_RECORD_READER_H_
+ #define TENSORFLOW_LIB_IO_RECORD_READER_H_
+ 
++# if __WORDSIZE == 64
++#  define SIZE_MAX              (18446744073709551615UL)
++# else
++#  define SIZE_MAX              (4294967295U)
++# endif
++
+ #include "tensorflow/core/lib/core/errors.h"
+ #include "tensorflow/core/lib/core/stringpiece.h"
+ #include "tensorflow/core/lib/io/inputstream_interface.h"
+@@ -26,6 +32,7 @@ limitations under the License.
+ #include "tensorflow/core/platform/macros.h"
+ #include "tensorflow/core/platform/types.h"
+ 
++
+ namespace tensorflow {
+ 
+ class RandomAccessFile;
+diff --git a/tensorflow/core/platform/cpu_feature_guard.cc b/tensorflow/core/platform/cpu_feature_guard.cc
+index 9d00aa7..f4f5ab4 100644
+--- a/tensorflow/core/platform/cpu_feature_guard.cc
++++ b/tensorflow/core/platform/cpu_feature_guard.cc
+@@ -60,31 +60,31 @@ class CPUFeatureGuard {
+  public:
+   CPUFeatureGuard() {
+ #ifdef __SSE__
+-    CheckFeatureOrDie(CPUFeature::SSE, "SSE");
++    //CheckFeatureOrDie(CPUFeature::SSE, "SSE");
+ #endif  // __SSE__
+ #ifdef __SSE2__
+-    CheckFeatureOrDie(CPUFeature::SSE2, "SSE2");
++    //CheckFeatureOrDie(CPUFeature::SSE2, "SSE2");
+ #endif  // __SSE2__
+ #ifdef __SSE3__
+-    CheckFeatureOrDie(CPUFeature::SSE3, "SSE3");
++    //CheckFeatureOrDie(CPUFeature::SSE3, "SSE3");
+ #endif  // __SSE3__
+ #ifdef __SSE4_1__
+-    CheckFeatureOrDie(CPUFeature::SSE4_1, "SSE4.1");
++    //CheckFeatureOrDie(CPUFeature::SSE4_1, "SSE4.1");
+ #endif  // __SSE4_1__
+ #ifdef __SSE4_2__
+-    CheckFeatureOrDie(CPUFeature::SSE4_2, "SSE4.2");
++    //CheckFeatureOrDie(CPUFeature::SSE4_2, "SSE4.2");
+ #endif  // __SSE4_2__
+ #ifdef __AVX__
+-    CheckFeatureOrDie(CPUFeature::AVX, "AVX");
++    //CheckFeatureOrDie(CPUFeature::AVX, "AVX");
+ #endif  // __AVX__
+ #ifdef __AVX2__
+-    CheckFeatureOrDie(CPUFeature::AVX2, "AVX2");
++    //CheckFeatureOrDie(CPUFeature::AVX2, "AVX2");
+ #endif  // __AVX2__
+ #ifdef __AVX512F__
+-    CheckFeatureOrDie(CPUFeature::AVX512F, "AVX512F");
++    //CheckFeatureOrDie(CPUFeature::AVX512F, "AVX512F");
+ #endif  // __AVX512F__
+ #ifdef __FMA__
+-    CheckFeatureOrDie(CPUFeature::FMA, "FMA");
++    //CheckFeatureOrDie(CPUFeature::FMA, "FMA");
+ #endif  // __FMA__
+   }
+ };
+diff --git a/tensorflow/core/platform/cuda_libdevice_path.h b/tensorflow/core/platform/cuda_libdevice_path.h
+index 6ef565e..18f15dd 100644
+--- a/tensorflow/core/platform/cuda_libdevice_path.h
++++ b/tensorflow/core/platform/cuda_libdevice_path.h
+@@ -21,7 +21,7 @@ limitations under the License.
+ namespace tensorflow {
+ 
+ // Returns the root directory of the CUDA SDK, which contains sub-folders such
+-// as bin, lib64, and nvvm.
++// as bin, lib, and nvvm.
+ string CudaRoot();
+ 
+ // Returns the directory that contains nvvm libdevice files in the CUDA SDK.
+diff --git a/tensorflow/core/platform/default/build_config/BUILD b/tensorflow/core/platform/default/build_config/BUILD
+index c17e481..89f977b 100644
+--- a/tensorflow/core/platform/default/build_config/BUILD
++++ b/tensorflow/core/platform/default/build_config/BUILD
+@@ -233,8 +233,8 @@ cc_library(
+             "-Wl,-rpath,../local_config_cuda/cuda/extras/CUPTI/lib",
+         ],
+         "//conditions:default": [
+-            "-Wl,-rpath,../local_config_cuda/cuda/lib64",
+-            "-Wl,-rpath,../local_config_cuda/cuda/extras/CUPTI/lib64",
++            "-Wl,-rpath,../local_config_cuda/cuda/lib",
++            "-Wl,-rpath,../local_config_cuda/cuda/extras/CUPTI/lib",
+         ],
+     }),
+     deps = [
+diff --git a/tensorflow/core/platform/default/platform.bzl b/tensorflow/core/platform/default/platform.bzl
+index 20ab441..ee961e9 100644
+--- a/tensorflow/core/platform/default/platform.bzl
++++ b/tensorflow/core/platform/default/platform.bzl
+@@ -18,15 +18,15 @@ def cuda_library_path(name, version = cuda_sdk_version()):
+       return "lib/lib{}.{}.dylib".format(name, version)
+   else:
+     if not version:
+-      return "lib64/lib{}.so".format(name)
++      return "lib/lib{}.so".format(name)
+     else:
+-      return "lib64/lib{}.so.{}".format(name, version)
++      return "lib/lib{}.so.{}".format(name, version)
+ 
+ def cuda_static_library_path(name):
+   if PLATFORM == "Darwin":
+     return "lib/lib{}_static.a".format(name)
+   else:
+-    return "lib64/lib{}_static.a".format(name)
++    return "lib/lib{}_static.a".format(name)
+ 
+ def cudnn_library_path(version = cudnn_sdk_version()):
+   if PLATFORM == "Darwin":
+@@ -36,9 +36,9 @@ def cudnn_library_path(version = cudnn_sdk_version()):
+       return "lib/libcudnn.{}.dylib".format(version)
+   else:
+     if not version:
+-      return "lib64/libcudnn.so"
++      return "lib/libcudnn.so"
+     else:
+-      return "lib64/libcudnn.so.{}".format(version)
++      return "lib/libcudnn.so.{}".format(version)
+ 
+ def cupti_library_path(version = cuda_sdk_version()):
+   if PLATFORM == "Darwin":
+@@ -48,9 +48,9 @@ def cupti_library_path(version = cuda_sdk_version()):
+       return "extras/CUPTI/lib/libcupti.{}.dylib".format(version)
+   else:
+     if not version:
+-      return "extras/CUPTI/lib64/libcupti.so"
++      return "extras/CUPTI/lib/libcupti.so"
+     else:
+-      return "extras/CUPTI/lib64/libcupti.so.{}".format(version)
++      return "extras/CUPTI/lib/libcupti.so.{}".format(version)
+ 
+ def readlink_command():
+   if PLATFORM == "Darwin":
+diff --git a/tensorflow/core/platform/posix/port.cc b/tensorflow/core/platform/posix/port.cc
+index 708f32b..a02ce0a 100644
+--- a/tensorflow/core/platform/posix/port.cc
++++ b/tensorflow/core/platform/posix/port.cc
+@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
+ limitations under the License.
+ ==============================================================================*/
+ 
++# define INT64_MAX              (__INT64_C(9223372036854775807))
++
+ #ifdef TENSORFLOW_USE_JEMALLOC
+ #include "jemalloc/jemalloc.h"
+ #endif
+diff --git a/tensorflow/core/util/proto/decode.h b/tensorflow/core/util/proto/decode.h
+index 74634a3..bef8d28 100644
+--- a/tensorflow/core/util/proto/decode.h
++++ b/tensorflow/core/util/proto/decode.h
+@@ -23,6 +23,9 @@ limitations under the License.
+ // complicated things to ensure that this code is called
+ // safely. Changes to this code should be thoroughly fuzz tested.
+ 
++# define INT64_MIN              (-__INT64_C(9223372036854775807)-1)
++# define INT64_MAX              (__INT64_C(9223372036854775807))
++
+ #ifndef TENSORFLOW_CORE_UTIL_PROTO_DECODE_H_
+ #define TENSORFLOW_CORE_UTIL_PROTO_DECODE_H_
+ 
+diff --git a/tensorflow/docs_src/extend/adding_an_op.md b/tensorflow/docs_src/extend/adding_an_op.md
+index 1b028be..3e786a5 100644
+--- a/tensorflow/docs_src/extend/adding_an_op.md
++++ b/tensorflow/docs_src/extend/adding_an_op.md
+@@ -1251,9 +1251,9 @@ g++ -std=c++11 -shared -o cuda_op_kernel.so cuda_op_kernel.cc \
+ `cuda_op_kernel.so` produced above can be loaded as usual in Python, using the
+ `tf.load_op_library` function.
+ 
+-Note that if your CUDA libraries are not installed in `/usr/local/lib64`,
++Note that if your CUDA libraries are not installed in `/usr/local/lib`,
+ you'll need to specify the path explicitly in the second (g++) command above.
+-For example, add `-L /usr/local/cuda-8.0/lib64/` if your CUDA is installed in
++For example, add `-L /usr/local/cuda-8.0/lib/` if your CUDA is installed in
+ `/usr/local/cuda-8.0`.
+ 
+ >   Note in some linux settings, additional options to `nvcc` compiling step are needed. Add `-D_MWAITXINTRIN_H_INCLUDED` to the `nvcc` command line to avoid errors from `mwaitxintrin.h`.
+diff --git a/tensorflow/docs_src/install/install_linux.md b/tensorflow/docs_src/install/install_linux.md
+index 10ca0b2..f3e6fd6 100644
+--- a/tensorflow/docs_src/install/install_linux.md
++++ b/tensorflow/docs_src/install/install_linux.md
+@@ -522,7 +522,7 @@ on your system:
+ Add this path to the `LD_LIBRARY_PATH` environmental variable:
+ 
+ <pre class="prettyprint lang-bsh">
+-  <code class="devsite-terminal">export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:+${LD_LIBRARY_PATH}:}/usr/local/cuda/extras/CUPTI/lib64</code>
++  <code class="devsite-terminal">export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:+${LD_LIBRARY_PATH}:}/usr/local/cuda/extras/CUPTI/lib</code>
+ </pre>
+ 
+ * *OPTIONAL*:  For optimized performance during inference, install
+diff --git a/tensorflow/docs_src/install/install_sources.md b/tensorflow/docs_src/install/install_sources.md
+index b5ad8cb..96590e3 100644
+--- a/tensorflow/docs_src/install/install_sources.md
++++ b/tensorflow/docs_src/install/install_sources.md
+@@ -147,7 +147,7 @@ The following NVIDIA <i>software</i> must be installed on your system:
+     you also need to append its path to the `LD_LIBRARY_PATH` environment
+     variable:
+ 
+-    <pre> $ <b>export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/extras/CUPTI/lib64</b> </pre>
++    <pre> $ <b>export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/extras/CUPTI/lib</b> </pre>
+ 
+ ### Next
+ 
+diff --git a/tensorflow/docs_src/performance/xla/jit.md b/tensorflow/docs_src/performance/xla/jit.md
+index 6724d1e..f0393e9 100644
+--- a/tensorflow/docs_src/performance/xla/jit.md
++++ b/tensorflow/docs_src/performance/xla/jit.md
+@@ -101,7 +101,7 @@ on. Currently JIT at the session level, which is what is used for the tutorial,
+ only supports GPU.
+ 
+ Before starting the tutorial verify that the LD_LIBRARY environment variable or
+-ldconfig contains `$CUDA_ROOT/extras/CUPTI/lib64`, which contains libraries for
++ldconfig contains `$CUDA_ROOT/extras/CUPTI/lib`, which contains libraries for
+ the CUDA Profiling Tools Interface [(CUPTI)](http://docs.nvidia.com/cuda/cupti/index.html).
+ TensorFlow uses CUPTI to pull tracing information from the GPU.
+ 
+diff --git a/tensorflow/python/build_defs.bzl b/tensorflow/python/build_defs.bzl
+index b9056f8..adabf8a 100644
+--- a/tensorflow/python/build_defs.bzl
++++ b/tensorflow/python/build_defs.bzl
+@@ -20,10 +20,50 @@ def tf_gen_op_wrapper_private_py(name, out=None, deps=[],
+   if not visibility:
+     visibility = ["//visibility:private"]
+   bare_op_name = name[:-4] # Strip off the _gen
++  lopts=[]
++  if name in [
++	"array_ops_gen",
++	"audio_ops_gen",
++	"batch_ops_gen",
++	"bitwise_ops_gen",
++	"boosted_trees_ops_gen",
++	"candidate_sampling_ops_gen",
++	"checkpoint_ops_gen",
++	"collective_ops_gen",
++	"control_flow_ops_gen",
++	"ctc_ops_gen",
++	"cudnn_rnn_ops_gen",
++	"data_flow_ops_gen",
++	"dataset_ops_gen",
++	"functional_ops_gen",
++	"image_ops_gen",
++	"io_ops_gen",
++	"linalg_ops_gen",
++	"list_ops_gen",
++	"logging_ops_gen",
++	"lookup_ops_gen",
++	"manip_ops_gen",
++	"math_ops_gen",
++	"nn_ops_gen",
++	"parsing_ops_gen",
++	"random_ops_gen",
++	"resource_variable_ops_gen",
++	"script_ops_gen",
++	"sdca_ops_gen",
++	"set_ops_gen",
++	"sparse_ops_gen",
++	"spectral_ops_gen",
++	"state_ops_gen",
++	"string_ops_gen",
++	"summary_ops_gen",
++	"training_ops_gen",
++	"user_ops_gen",]:
++    lopts=['-ltensorflow_framework']
+   tf_gen_op_wrapper_py(name=bare_op_name,
+     out=out,
+     visibility=visibility,
+     deps=deps,
++    cc_linkopts=lopts,
+     require_shape_functions=require_shape_functions,
+     generated_target_name=name,
+     api_def_srcs = [
+diff --git a/tensorflow/stream_executor/dso_loader.cc b/tensorflow/stream_executor/dso_loader.cc
+index 114143b..7ec5cce 100644
+--- a/tensorflow/stream_executor/dso_loader.cc
++++ b/tensorflow/stream_executor/dso_loader.cc
+@@ -164,7 +164,7 @@ static std::vector<string>* CreatePrimordialRpaths() {
+ #if defined(__APPLE__)
+   rpaths->push_back("driver/driver_sh.runfiles/local_config_cuda/cuda/lib");
+ #else
+-  rpaths->push_back("driver/driver_sh.runfiles/local_config_cuda/cuda/lib64");
++  rpaths->push_back("driver/driver_sh.runfiles/local_config_cuda/cuda/lib");
+ #endif
+   return rpaths;
+ }
+@@ -219,7 +219,7 @@ static std::vector<string>* CreatePrimordialRpaths() {
+ #if defined(__APPLE__)
+   return "external/local_config_cuda/cuda/lib";
+ #else
+-  return "external/local_config_cuda/cuda/lib64";
++  return "external/local_config_cuda/cuda/lib";
+ #endif
+ }
+ 
+@@ -229,7 +229,7 @@ static std::vector<string>* CreatePrimordialRpaths() {
+ #elif defined(PLATFORM_WINDOWS)
+   return "";
+ #else
+-  return "external/local_config_cuda/cuda/driver/lib64";
++  return "external/local_config_cuda/cuda/driver/lib";
+ #endif
+ }
+ 
+@@ -237,7 +237,7 @@ static std::vector<string>* CreatePrimordialRpaths() {
+ #if defined(__APPLE__)
+   return "external/local_config_cuda/cuda/extras/CUPTI/lib";
+ #else
+-  return "external/local_config_cuda/cuda/extras/CUPTI/lib64";
++  return "external/local_config_cuda/cuda/extras/CUPTI/lib";
+ #endif
+ }
+ 
+diff --git a/tensorflow/stream_executor/dso_loader.h b/tensorflow/stream_executor/dso_loader.h
+index 9ee081c..f74feed 100644
+--- a/tensorflow/stream_executor/dso_loader.h
++++ b/tensorflow/stream_executor/dso_loader.h
+@@ -79,7 +79,7 @@ class DsoLoader {
+   // Arguments:
+   //   library_name: the filename in tree; e.g. libOpenCL.so.1.0.0
+   //   runfiles_relpath: where to look for the library relative to the runfiles
+-  //      root; e.g. third_party/gpus/cuda/lib64
++  //      root; e.g. third_party/gpus/cuda/lib
+   static string FindDsoPath(port::StringPiece library_name,
+                             port::StringPiece runfiles_relpath);
+ 
+diff --git a/tensorflow/tensorflow.bzl b/tensorflow/tensorflow.bzl
+index b59f8e1..45e0890 100644
+--- a/tensorflow/tensorflow.bzl
++++ b/tensorflow/tensorflow.bzl
+@@ -375,10 +375,43 @@ def tf_gen_op_wrapper_cc(name,
+   tool = out_ops_file + "_gen_cc"
+   if deps == None:
+     deps = [pkg + ":" + name + "_op_lib"]
++  lopts=if_not_windows(["-lm"])
++  if name in [
++	"cc_ops",
++	"sendrecv_ops",
++	"function_ops",
++	"functional_ops",
++	"resource_variable_ops",
++	"remote_fused_graph_ops",
++	"test_op",
++
++	"array_ops",
++        "audio_ops",
++        "candidate_sampling_ops",
++        "control_flow_ops",
++        "data_flow_ops",
++        "image_ops",
++        "io_ops",
++        "linalg_ops",
++        "logging_ops",
++        "lookup_ops",
++        "manip_ops",
++        "math_ops",
++        "nn_ops",
++        "no_op",
++        "parsing_ops",
++        "random_ops",
++        "sparse_ops",
++        "state_ops",
++        "string_ops",
++        "training_ops",
++        "user_ops",
++  ]:
++    lopts+=['-ltensorflow_framework']
+   tf_cc_binary(
+       name=tool,
+       copts=tf_copts(),
+-      linkopts=if_not_windows(["-lm"]),
++      linkopts=lopts,
+       linkstatic=1,  # Faster to link this one-time-use binary dynamically
+       deps=[op_gen] + deps)
+ 
+@@ -545,9 +578,64 @@ def tf_gen_op_wrapper_py(name,
+   tool_name = "gen_" + name + "_py_wrappers_cc"
+   if not deps:
+     deps = [str(Label("//tensorflow/core:" + name + "_op_lib"))]
++  lopts = if_not_windows(["-lm"])
++  if name in [
++        "beam_search_ops",
++	"decode_audio_op_py",
++	"decode_video_op_py",
++	"distort_image_ops",
++	"encode_audio_op_py",
++	"fused_conv2d_bias_activation_op",
++	"gen_bigquery_reader_ops",
++	"gen_clustering_ops",
++	"gen_coder_ops",
++	"gen_dataset_ops",
++	"gen_dataset_ops",
++	"gen_decode_proto_op_py",
++	"gen_encode_proto_op_py",
++	"gen_factorization_ops",
++	"gen_gcs_config_ops",
++	"gen_model_ops_py",
++	"gen_model_ops_py",
++	"gen_periodic_resample_op_py",
++	"gen_prediction_ops_py",
++	"gen_quantile_ops_py_wrap",
++	"gen_remote_fused_graph_ops",
++	"gen_rpc_op_py",
++	"gen_skip_gram_ops",
++	"gen_split_handler_ops_py",
++	"gen_stats_accumulator_ops_py_wrap",
++	"gen_stats_ops_py",
++	"gen_tensor_forest_ops",
++	"gen_training_ops_py",
++	"gen_variable_ops",
++	"gen_xla_ops",
++	"gru_ops",
++	"image_ops",
++	"inc_op",
++	"input_pipeline_ops",
++	"libsvm_ops",
++	"lstm_ops",
++	"memory_stats_ops",
++	"mpi_ops",
++	"nccl_ops",
++	"nearest_neighbor_ops_pywrapper",
++	"reduce_slice_ops",
++	"resampler_ops",
++	"single_image_random_dot_stereograms_ops",
++	"sparse_feature_cross_op",
++	"stateless_random_ops",
++	"test_ops",
++	"test_ops_2",
++	"tpu_ops",
++	"training_ops",
++	"trt_engine_op",
++    ]:
++    lopts=lopts+['-ltensorflow_framework']
++
+   tf_cc_binary(
+       name=tool_name,
+-      linkopts=if_not_windows(["-lm"]) + cc_linkopts,
++      linkopts=lopts + cc_linkopts,
+       copts=tf_copts(),
+       linkstatic=1,  # Faster to link this one-time-use binary dynamically
+       deps=([
+diff --git a/tensorflow/tools/ci_build/Dockerfile.gpu b/tensorflow/tools/ci_build/Dockerfile.gpu
+index 7591ecc..1ba79f7 100644
+--- a/tensorflow/tools/ci_build/Dockerfile.gpu
++++ b/tensorflow/tools/ci_build/Dockerfile.gpu
+@@ -5,7 +5,7 @@ LABEL maintainer="Jan Prach <jendap@google.com>"
+ # In the Ubuntu 16.04 images, cudnn is placed in system paths. Move them to
+ # /usr/local/cuda
+ RUN cp -P /usr/include/cudnn.h /usr/local/cuda/include
+-RUN cp -P /usr/lib/x86_64-linux-gnu/libcudnn* /usr/local/cuda/lib64
++RUN cp -P /usr/lib/x86_64-linux-gnu/libcudnn* /usr/local/cuda/lib
+ 
+ # Copy and run the install scripts.
+ COPY install/*.sh /install/
+@@ -20,7 +20,7 @@ RUN /install/install_golang.sh
+ 
+ # Set up the master bazelrc configuration file.
+ COPY install/.bazelrc /etc/bazel.bazelrc
+-ENV LD_LIBRARY_PATH /usr/local/cuda/extras/CUPTI/lib64:$LD_LIBRARY_PATH
++ENV LD_LIBRARY_PATH /usr/local/cuda/extras/CUPTI/lib:$LD_LIBRARY_PATH
+ 
+ # Configure the build for our CUDA configuration.
+ ENV TF_NEED_CUDA 1
+diff --git a/tensorflow/tools/ci_build/Dockerfile.rbe.gpu b/tensorflow/tools/ci_build/Dockerfile.rbe.gpu
+index 24ff476..f6f2b39 100644
+--- a/tensorflow/tools/ci_build/Dockerfile.rbe.gpu
++++ b/tensorflow/tools/ci_build/Dockerfile.rbe.gpu
+@@ -5,7 +5,7 @@ LABEL maintainer="Nick Lopez <ngiraldo@google.com>"
+ # In the Ubuntu 16.04 images, cudnn is placed in system paths. Move them to
+ # /usr/local/cuda
+ RUN cp -P /usr/include/cudnn.h /usr/local/cuda/include
+-RUN cp -P /usr/lib/x86_64-linux-gnu/libcudnn* /usr/local/cuda/lib64
++RUN cp -P /usr/lib/x86_64-linux-gnu/libcudnn* /usr/local/cuda/lib
+ 
+ # Copy and run the install scripts.
+ COPY install/*.sh /install/
+diff --git a/tensorflow/tools/ci_build/builds/test_user_ops.sh b/tensorflow/tools/ci_build/builds/test_user_ops.sh
+index 25ecee4..99dc53c 100755
+--- a/tensorflow/tools/ci_build/builds/test_user_ops.sh
++++ b/tensorflow/tools/ci_build/builds/test_user_ops.sh
+@@ -187,13 +187,13 @@ else
+       ${TF_CFLAGS[@]} -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC || \
+       die "nvcc compilation of ${OP_KERNEL_CC} FAILED"
+ 
+-  CUDA_LIB_DIR="/usr/local/cuda/lib64"
++  CUDA_LIB_DIR="/usr/local/cuda/lib"
+   if [[ ! -d "${CUDA_LIB_DIR}" ]]; then
+     CUDA_LIB_DIR="/usr/local/cuda/lib"
+   fi
+   if [[ ! -d "${CUDA_LIB_DIR}" ]]; then
+     die "ERROR: Failed to find CUDA library directory at either of "
+-"/usr/local/cuda/lib and /usr/local/cuda/lib64"
++"/usr/local/cuda/lib and /usr/local/cuda/lib"
+   fi
+ 
+   echo "Found CUDA library diretory at: ${CUDA_LIB_DIR}"
+diff --git a/tensorflow/tools/docker/Dockerfile.devel-gpu b/tensorflow/tools/docker/Dockerfile.devel-gpu
+index 204b5b4..741a3fe 100644
+--- a/tensorflow/tools/docker/Dockerfile.devel-gpu
++++ b/tensorflow/tools/docker/Dockerfile.devel-gpu
+@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
+         wget \
+         && \
+     rm -rf /var/lib/apt/lists/* && \
+-    find /usr/local/cuda-9.0/lib64/ -type f -name 'lib*_static.a' -not -name 'libcudart_static.a' -delete && \
++    find /usr/local/cuda-9.0/lib/ -type f -name 'lib*_static.a' -not -name 'libcudart_static.a' -delete && \
+     rm /usr/lib/x86_64-linux-gnu/libcudnn_static_v7.a
+ 
+ RUN curl -fSsL -O https://bootstrap.pypa.io/get-pip.py && \
+@@ -89,19 +89,19 @@ RUN git clone --branch=r1.9 --depth=1 https://github.com/tensorflow/tensorflow.g
+ 
+ # Configure the build for our CUDA configuration.
+ ENV CI_BUILD_PYTHON python
+-ENV LD_LIBRARY_PATH /usr/local/cuda/extras/CUPTI/lib64:$LD_LIBRARY_PATH
++ENV LD_LIBRARY_PATH /usr/local/cuda/extras/CUPTI/lib:$LD_LIBRARY_PATH
+ ENV TF_NEED_CUDA 1
+ ENV TF_CUDA_COMPUTE_CAPABILITIES=3.0,3.5,5.2,6.0,6.1
+ ENV TF_CUDA_VERSION=9.0
+ ENV TF_CUDNN_VERSION=7
+ 
+-RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 && \
+-    LD_LIBRARY_PATH=/usr/local/cuda/lib64/stubs:${LD_LIBRARY_PATH} \
++RUN ln -s /usr/local/cuda/lib/stubs/libcuda.so /usr/local/cuda/lib/stubs/libcuda.so.1 && \
++    LD_LIBRARY_PATH=/usr/local/cuda/lib/stubs:${LD_LIBRARY_PATH} \
+     tensorflow/tools/ci_build/builds/configured GPU \
+     bazel build -c opt --copt=-mavx --config=cuda \
+ 	--cxxopt="-D_GLIBCXX_USE_CXX11_ABI=0" \
+         tensorflow/tools/pip_package:build_pip_package && \
+-    rm /usr/local/cuda/lib64/stubs/libcuda.so.1 && \
++    rm /usr/local/cuda/lib/stubs/libcuda.so.1 && \
+     bazel-bin/tensorflow/tools/pip_package/build_pip_package /tmp/pip && \
+     pip --no-cache-dir install --upgrade /tmp/pip/tensorflow-*.whl && \
+     rm -rf /tmp/pip && \
+diff --git a/tensorflow/tools/docker/Dockerfile.gpu b/tensorflow/tools/docker/Dockerfile.gpu
+index 9197651..0bbf71b 100644
+--- a/tensorflow/tools/docker/Dockerfile.gpu
++++ b/tensorflow/tools/docker/Dockerfile.gpu
+@@ -69,7 +69,7 @@ COPY notebooks /notebooks
+ COPY run_jupyter.sh /
+ 
+ # For CUDA profiling, TensorFlow requires CUPTI.
+-ENV LD_LIBRARY_PATH /usr/local/cuda/extras/CUPTI/lib64:$LD_LIBRARY_PATH
++ENV LD_LIBRARY_PATH /usr/local/cuda/extras/CUPTI/lib:$LD_LIBRARY_PATH
+ 
+ # TensorBoard
+ EXPOSE 6006
+diff --git a/tensorflow/tools/pip_package/setup.py b/tensorflow/tools/pip_package/setup.py
+index dc9d059..a68de46 100644
+--- a/tensorflow/tools/pip_package/setup.py
++++ b/tensorflow/tools/pip_package/setup.py
+@@ -55,15 +55,14 @@ REQUIRED_PACKAGES = [
+     'six >= 1.10.0',
+     'protobuf >= 3.4.0',
+     'setuptools <= 39.1.0',
+-    'tensorboard >= 1.9.0, < 1.10.0',
+     'termcolor >= 1.1.0',
+ ]
+ 
+-if sys.byteorder == 'little':
++#if sys.byteorder == 'little':
+   # grpcio does not build correctly on big-endian machines due to lack of
+   # BoringSSL support.
+   # See https://github.com/tensorflow/tensorflow/issues/17882.
+-  REQUIRED_PACKAGES.append('grpcio >= 1.8.6')
++  # REQUIRED_PACKAGES.append('grpcio >= 1.8.6')
+ 
+ project_name = 'tensorflow'
+ if '--project_name' in sys.argv:
+@@ -103,7 +102,7 @@ CONSOLE_SCRIPTS = [
+     # is now declared by the tensorboard pip package. If we remove the
+     # TensorBoard command, pip will inappropriately remove it during install,
+     # even though the command is not removed, just moved to a different wheel.
+-    'tensorboard = tensorboard.main:run_main',
++    # 'tensorboard = tensorboard.main:run_main',
+ ]
+ # pylint: enable=line-too-long
+ 
+diff --git a/third_party/gpus/cuda_configure.bzl b/third_party/gpus/cuda_configure.bzl
+index c90c669..b9da0ed 100644
+--- a/third_party/gpus/cuda_configure.bzl
++++ b/third_party/gpus/cuda_configure.bzl
+@@ -42,10 +42,10 @@ _DEFAULT_CUDA_COMPUTE_CAPABILITIES = ["3.5", "5.2"]
+ #
+ # Paths will be tried out in the order listed below. The first successful path
+ # will be used. For example, when looking for the cudart libraries, the first
+-# attempt will be lib64/cudart inside the CUDA toolkit.
++# attempt will be lib/cudart inside the CUDA toolkit.
+ CUDA_LIB_PATHS = [
+-  "lib64/",
+-  "lib64/stubs/",
++  "lib/",
++  "lib/stubs/",
+   "lib/x86_64-linux-gnu/",
+   "lib/x64/",
+   "lib/",
+@@ -66,9 +66,9 @@ CUPTI_HEADER_PATHS = [
+ # On most systems, the cupti library is not installed in the same directory as
+ # the other CUDA libraries but rather in a special extras/CUPTI directory.
+ CUPTI_LIB_PATHS = [
+-  "extras/CUPTI/lib64/",
++  "extras/CUPTI/lib/",
+   "lib/x86_64-linux-gnu",
+-  "lib64/",
++  "lib/",
+   "extras/CUPTI/libx64/",
+   "extras/CUPTI/lib/",
+   "lib/",
+diff --git a/third_party/sycl/crosstool/CROSSTOOL.tpl b/third_party/sycl/crosstool/CROSSTOOL.tpl
+index f8e50ef..3bac416 100755
+--- a/third_party/sycl/crosstool/CROSSTOOL.tpl
++++ b/third_party/sycl/crosstool/CROSSTOOL.tpl
+@@ -49,7 +49,7 @@ toolchain {
+   # to be fixed, maybe with auto-detection?
+   cxx_builtin_include_directory: "/usr/lib/gcc/"
+   cxx_builtin_include_directory: "/usr/lib"
+-  cxx_builtin_include_directory: "/usr/lib64"
++  cxx_builtin_include_directory: "/usr/lib"
+   cxx_builtin_include_directory: "/usr/local/include"
+   cxx_builtin_include_directory: "/usr/include"
+ 
+@@ -160,7 +160,7 @@ toolchain {
+   # to be fixed, maybe with auto-detection?
+   cxx_builtin_include_directory: "/usr/lib/gcc/"
+   cxx_builtin_include_directory: "/usr/lib"
+-  cxx_builtin_include_directory: "/usr/lib64"
++  cxx_builtin_include_directory: "/usr/lib"
+   cxx_builtin_include_directory: "/usr/local/include"
+   cxx_builtin_include_directory: "/usr/include"
+ 
+diff --git a/third_party/toolchains/gpus/cuda/BUILD b/third_party/toolchains/gpus/cuda/BUILD
+index 4cb8380..24beab8 100644
+--- a/third_party/toolchains/gpus/cuda/BUILD
++++ b/third_party/toolchains/gpus/cuda/BUILD
+@@ -1193,9 +1193,9 @@ genrule(
+     outs = [
+         "cuda/nvvm/bin/cicc",
+         "cuda/nvvm/include/nvvm.h",
+-        "cuda/nvvm/lib64/libnvvm.so",
+-        "cuda/nvvm/lib64/libnvvm.so.3",
+-        "cuda/nvvm/lib64/libnvvm.so.3.2.0",
++        "cuda/nvvm/lib/libnvvm.so",
++        "cuda/nvvm/lib/libnvvm.so.3",
++        "cuda/nvvm/lib/libnvvm.so.3.2.0",
+         "cuda/nvvm/libdevice/libdevice.10.bc",
+         "cuda/nvvm/libnvvm-samples/CMakeLists.txt",
+         "cuda/nvvm/libnvvm-samples/README.txt",
+@@ -1217,7 +1217,7 @@ genrule(
+         "cuda/nvvm/libnvvm-samples/simple/simple.c",
+     ],
+     cmd = """
+-if [ -d "$(@D)/extras" ]; then rm $(@D)/extras -drf; fi && if [ -d "$(@D)/include" ]; then rm $(@D)/include -drf; fi && if [ -d "$(@D)/lib" ]; then rm $(@D)/lib -drf; fi && if [ -d "$(@D)/nvvm" ]; then rm $(@D)/nvvm -drf; fi && cp "/usr/local/cuda-9.0/nvvm/bin/cicc" "$(@D)/cuda/nvvm/bin/cicc" && cp "/usr/local/cuda-9.0/nvvm/include/nvvm.h" "$(@D)/cuda/nvvm/include/nvvm.h" && cp "/usr/local/cuda-9.0/nvvm/lib64/libnvvm.so" "$(@D)/cuda/nvvm/lib64/libnvvm.so" && cp "/usr/local/cuda-9.0/nvvm/lib64/libnvvm.so.3" "$(@D)/cuda/nvvm/lib64/libnvvm.so.3" && cp "/usr/local/cuda-9.0/nvvm/lib64/libnvvm.so.3.2.0" "$(@D)/cuda/nvvm/lib64/libnvvm.so.3.2.0" && cp "/usr/local/cuda-9.0/nvvm/libdevice/libdevice.10.bc" "$(@D)/cuda/nvvm/libdevice/libdevice.10.bc" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/CMakeLists.txt" "$(@D)/cuda/nvvm/libnvvm-samples/CMakeLists.txt" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/README.txt" "$(@D)/cuda/nvvm/libnvvm-samples/README.txt" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/build.bat" "$(@D)/cuda/nvvm/libnvvm-samples/build.bat" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/build.sh" "$(@D)/cuda/nvvm/libnvvm-samples/build.sh" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/common/include/DDSWriter.h" "$(@D)/cuda/nvvm/libnvvm-samples/common/include/DDSWriter.h" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/common/include/drvapi_error_string.h" "$(@D)/cuda/nvvm/libnvvm-samples/common/include/drvapi_error_string.h" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/cuda-c-linking/CMakeLists.txt" "$(@D)/cuda/nvvm/libnvvm-samples/cuda-c-linking/CMakeLists.txt" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/cuda-c-linking/README.txt" "$(@D)/cuda/nvvm/libnvvm-samples/cuda-c-linking/README.txt" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/cuda-c-linking/cuda-c-linking.cpp" "$(@D)/cuda/nvvm/libnvvm-samples/cuda-c-linking/cuda-c-linking.cpp" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/cuda-c-linking/math-funcs.cu" "$(@D)/cuda/nvvm/libnvvm-samples/cuda-c-linking/math-funcs.cu" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/ptxgen/CMakeLists.txt" "$(@D)/cuda/nvvm/libnvvm-samples/ptxgen/CMakeLists.txt" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/ptxgen/README.txt" "$(@D)/cuda/nvvm/libnvvm-samples/ptxgen/README.txt" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/ptxgen/ptxgen.c" "$(@D)/cuda/nvvm/libnvvm-samples/ptxgen/ptxgen.c" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/simple/CMakeLists.txt" "$(@D)/cuda/nvvm/libnvvm-samples/simple/CMakeLists.txt" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/simple/README.txt" "$(@D)/cuda/nvvm/libnvvm-samples/simple/README.txt" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/simple/simple-gpu.ll" "$(@D)/cuda/nvvm/libnvvm-samples/simple/simple-gpu.ll" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/simple/simple-gpu64.ll" "$(@D)/cuda/nvvm/libnvvm-samples/simple/simple-gpu64.ll" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/simple/simple.c" "$(@D)/cuda/nvvm/libnvvm-samples/simple/simple.c"
++if [ -d "$(@D)/extras" ]; then rm $(@D)/extras -drf; fi && if [ -d "$(@D)/include" ]; then rm $(@D)/include -drf; fi && if [ -d "$(@D)/lib" ]; then rm $(@D)/lib -drf; fi && if [ -d "$(@D)/nvvm" ]; then rm $(@D)/nvvm -drf; fi && cp "/usr/local/cuda-9.0/nvvm/bin/cicc" "$(@D)/cuda/nvvm/bin/cicc" && cp "/usr/local/cuda-9.0/nvvm/include/nvvm.h" "$(@D)/cuda/nvvm/include/nvvm.h" && cp "/usr/local/cuda-9.0/nvvm/lib/libnvvm.so" "$(@D)/cuda/nvvm/lib/libnvvm.so" && cp "/usr/local/cuda-9.0/nvvm/lib/libnvvm.so.3" "$(@D)/cuda/nvvm/lib/libnvvm.so.3" && cp "/usr/local/cuda-9.0/nvvm/lib/libnvvm.so.3.2.0" "$(@D)/cuda/nvvm/lib/libnvvm.so.3.2.0" && cp "/usr/local/cuda-9.0/nvvm/libdevice/libdevice.10.bc" "$(@D)/cuda/nvvm/libdevice/libdevice.10.bc" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/CMakeLists.txt" "$(@D)/cuda/nvvm/libnvvm-samples/CMakeLists.txt" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/README.txt" "$(@D)/cuda/nvvm/libnvvm-samples/README.txt" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/build.bat" "$(@D)/cuda/nvvm/libnvvm-samples/build.bat" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/build.sh" "$(@D)/cuda/nvvm/libnvvm-samples/build.sh" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/common/include/DDSWriter.h" "$(@D)/cuda/nvvm/libnvvm-samples/common/include/DDSWriter.h" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/common/include/drvapi_error_string.h" "$(@D)/cuda/nvvm/libnvvm-samples/common/include/drvapi_error_string.h" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/cuda-c-linking/CMakeLists.txt" "$(@D)/cuda/nvvm/libnvvm-samples/cuda-c-linking/CMakeLists.txt" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/cuda-c-linking/README.txt" "$(@D)/cuda/nvvm/libnvvm-samples/cuda-c-linking/README.txt" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/cuda-c-linking/cuda-c-linking.cpp" "$(@D)/cuda/nvvm/libnvvm-samples/cuda-c-linking/cuda-c-linking.cpp" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/cuda-c-linking/math-funcs.cu" "$(@D)/cuda/nvvm/libnvvm-samples/cuda-c-linking/math-funcs.cu" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/ptxgen/CMakeLists.txt" "$(@D)/cuda/nvvm/libnvvm-samples/ptxgen/CMakeLists.txt" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/ptxgen/README.txt" "$(@D)/cuda/nvvm/libnvvm-samples/ptxgen/README.txt" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/ptxgen/ptxgen.c" "$(@D)/cuda/nvvm/libnvvm-samples/ptxgen/ptxgen.c" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/simple/CMakeLists.txt" "$(@D)/cuda/nvvm/libnvvm-samples/simple/CMakeLists.txt" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/simple/README.txt" "$(@D)/cuda/nvvm/libnvvm-samples/simple/README.txt" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/simple/simple-gpu.ll" "$(@D)/cuda/nvvm/libnvvm-samples/simple/simple-gpu.ll" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/simple/simple-gpu64.ll" "$(@D)/cuda/nvvm/libnvvm-samples/simple/simple-gpu64.ll" && cp "/usr/local/cuda-9.0/nvvm/libnvvm-samples/simple/simple.c" "$(@D)/cuda/nvvm/libnvvm-samples/simple/simple.c"
+    """,
+ )
+ 
+@@ -1272,7 +1272,7 @@ genrule(
+         "cuda/lib/libcupti.so.9.0",
+     ],
+     cmd = """
+-if [ -d "$(@D)/extras" ]; then rm $(@D)/extras -drf; fi && if [ -d "$(@D)/include" ]; then rm $(@D)/include -drf; fi && if [ -d "$(@D)/lib" ]; then rm $(@D)/lib -drf; fi && if [ -d "$(@D)/nvvm" ]; then rm $(@D)/nvvm -drf; fi && cp "/usr/local/cuda-9.0/targets/x86_64-linux/lib/stubs/libcuda.so" "$(@D)/cuda/lib/libcuda.so" && cp "/usr/local/cuda-9.0/targets/x86_64-linux/lib/libcudart.so.9.0" "$(@D)/cuda/lib/libcudart.so.9.0" && cp "/usr/local/cuda-9.0/targets/x86_64-linux/lib/libcudart_static.a" "$(@D)/cuda/lib/libcudart_static.a" && cp "/usr/local/cuda-9.0/targets/x86_64-linux/lib/libcublas.so.9.0" "$(@D)/cuda/lib/libcublas.so.9.0" && cp "/usr/local/cuda-9.0/targets/x86_64-linux/lib/libcusolver.so.9.0" "$(@D)/cuda/lib/libcusolver.so.9.0" && cp "/usr/local/cuda-9.0/targets/x86_64-linux/lib/libcurand.so.9.0" "$(@D)/cuda/lib/libcurand.so.9.0" && cp "/usr/local/cuda-9.0/targets/x86_64-linux/lib/libcufft.so.9.0" "$(@D)/cuda/lib/libcufft.so.9.0" && cp "/usr/lib/x86_64-linux-gnu/libcudnn.so.7" "$(@D)/cuda/lib/libcudnn.so.7" && cp "/usr/local/cuda-9.0/extras/CUPTI/lib64/libcupti.so.9.0" "$(@D)/cuda/lib/libcupti.so.9.0"
++if [ -d "$(@D)/extras" ]; then rm $(@D)/extras -drf; fi && if [ -d "$(@D)/include" ]; then rm $(@D)/include -drf; fi && if [ -d "$(@D)/lib" ]; then rm $(@D)/lib -drf; fi && if [ -d "$(@D)/nvvm" ]; then rm $(@D)/nvvm -drf; fi && cp "/usr/local/cuda-9.0/targets/x86_64-linux/lib/stubs/libcuda.so" "$(@D)/cuda/lib/libcuda.so" && cp "/usr/local/cuda-9.0/targets/x86_64-linux/lib/libcudart.so.9.0" "$(@D)/cuda/lib/libcudart.so.9.0" && cp "/usr/local/cuda-9.0/targets/x86_64-linux/lib/libcudart_static.a" "$(@D)/cuda/lib/libcudart_static.a" && cp "/usr/local/cuda-9.0/targets/x86_64-linux/lib/libcublas.so.9.0" "$(@D)/cuda/lib/libcublas.so.9.0" && cp "/usr/local/cuda-9.0/targets/x86_64-linux/lib/libcusolver.so.9.0" "$(@D)/cuda/lib/libcusolver.so.9.0" && cp "/usr/local/cuda-9.0/targets/x86_64-linux/lib/libcurand.so.9.0" "$(@D)/cuda/lib/libcurand.so.9.0" && cp "/usr/local/cuda-9.0/targets/x86_64-linux/lib/libcufft.so.9.0" "$(@D)/cuda/lib/libcufft.so.9.0" && cp "/usr/lib/x86_64-linux-gnu/libcudnn.so.7" "$(@D)/cuda/lib/libcudnn.so.7" && cp "/usr/local/cuda-9.0/extras/CUPTI/lib/libcupti.so.9.0" "$(@D)/cuda/lib/libcupti.so.9.0"
+    """,
+ )
+ 
