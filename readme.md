@@ -38,9 +38,9 @@ Those cross-compiled python packages(for Hi3536 soc and hisiv400) are also uploa
 
 3. apply the patch file:
 ```
-cp tensorflow-on-hisi/hisiv400.diff tensorflow/
+cp tensorflow-on-hisi/hisiv400.patch tensorflow/
 cd tensorflow
-git apply hisiv400.diff
+git apply hisiv400.patch
 ```
 the patch do these things mainly:
 * define the cross-compile toolchain.
@@ -99,7 +99,7 @@ you whether the required library is properly linked to.
 3. "cannot import name xx" when import python package(suppose we name it yy): This error don't give any information about what's going wrong. But you can go to python's
  site-packages/yy directory and run `find . -name "*.so"` to list all .so files in package yy. You may find that the file name is complicated like `xx.cpython-36m-i386-linux-gnu.so`, 
 which contain the python version and platfrom information. Rename it to `xx.so` and the problem will be solved. I guess that python will check the filename to ensure 
-right .so library will be loaded. But for cross-compile you may generate wrong file name by change. 
+right .so library will be loaded. But for cross-compile you may generate wrong file name by chance. 
 
 ### Reference links
 * [海思3536：osdrv编译过程中报错及解决方法](https://blog.csdn.net/u010168781/article/details/65637105)
