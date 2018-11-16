@@ -6,8 +6,6 @@ This repo contain patches and instructions for cross-compile tensorflow-1.9(with
 Tested on hisilicon Hi3536(armv7-a) soc.  
 The cross-compile procedure is painful, you can go to release for the .whl file(if you have same toolchain and soc) when you don't care how to do it.  
 * [tensorflow-1.9.0](https://github.com/zhewang95/tensorflow-on-hisilicon/releases/download/v1.0.0/tensorflow-1.9.0-cp36-cp36m-linux_armv7l.whl)
-* [numpy-1.6.0](https://github.com/zhewang95/tensorflow-on-hisilicon/releases/download/v1.0.0/numpy-1.16.0.dev0+511787d-cp36-cp36m-linux_armv7l.whl)
-* [opencv-python-3.4.2](https://github.com/zhewang95/tensorflow-on-hisilicon/releases/download/v1.0.0/opencv_python-3.4.2+5b36c37-cp36-cp36m-linux_armv7l.whl)
 * [absl-0.5.0](https://github.com/zhewang95/tensorflow-on-hisilicon/releases/download/v1.0.0/absl_py-0.5.0-py3-none-linux_armv7l.whl)
 * [astor-0.6](https://github.com/zhewang95/tensorflow-on-hisilicon/releases/download/v1.0.0/astor-0.6-py2.py3-none-linux_armv7l.whl)
 * [gast-0.2.0](https://github.com/zhewang95/tensorflow-on-hisilicon/releases/download/v1.0.0/gast-0.2.0-py3-none-linux_armv7l.whl)
@@ -19,12 +17,13 @@ The cross-compile procedure is painful, you can go to release for the .whl file(
 Hisiv300 toolchain use uClibc, which is lighter than glibc. But uClibc don't contain fenv(which is needed by tf), so the cross compilation 
 with hisiv300 is more difficult. I recommand not to use hisiv300 toolchain to cross-compile tensorflow. However, there is also a .whl for hisiv300 toolchain.
 
-* [tensorflow-1.9.0(hisiv30)](https://github.com/zhewang95/tensorflow-on-hisilicon/releases/download/v0.9.0/tensorflow-1.9.0-cp35-none-linux_armv7l.whl)
+* [tensorflow-1.9.0(hisiv300)](https://github.com/zhewang95/tensorflow-on-hisilicon/releases/download/v0.9.0/tensorflow-1.9.0-cp35-none-linux_armv7l.whl)
 
 ### Other cross-compiled python packages.
 Those cross-compiled python packages(for Hi3536 soc and hisiv400) are also uploaded:
-* numpy(with OpenBLAS support)
-* opencv-python(with TBB support)
+
+* [numpy-1.6.0(with OpenBLAS support)](https://github.com/zhewang95/tensorflow-on-hisilicon/releases/download/v1.0.0/numpy-1.16.0.dev0+511787d-cp36-cp36m-linux_armv7l.whl)
+* [opencv-python-3.4.2(with TBB support)](https://github.com/zhewang95/tensorflow-on-hisilicon/releases/download/v1.0.0/opencv_python-3.4.2+5b36c37-cp36-cp36m-linux_armv7l.whl)
 
 ### Cross compile tf(for Hi3536 with hisiv400) by yourself
 1. before the cross compilation, you need:
