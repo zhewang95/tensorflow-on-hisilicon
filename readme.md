@@ -43,12 +43,47 @@ cd tensorflow
 git apply hisiv400.diff
 ```
 the patch do these things mainly:
-1. define the cross-compile toolchain.
-2. replace `lib64` with `lib` in all files cause Hi3536 is 32bit armv7l.
-3. repair missed `-ltensorflow_framework` dependency for some bazel targets.
-4. correct some errors caused by not properly inclueded `stdint.h`(But I still don't know why this header file can't be included correctly).
-5. disable intel vector instruction features(SSE, AVX .etc) check.
-6. remove tensorboard dependency.
+* define the cross-compile toolchain.
+* replace `lib64` with `lib` in all files cause Hi3536 is 32bit armv7l.
+* repair missed `-ltensorflow_framework` dependency for some bazel targets.
+* correct some errors caused by not properly inclueded `stdint.h`(But I still don't know why this header file can't be included correctly).
+* disable intel vector instruction features(SSE, AVX .etc) check.
+* remove tensorboard dependency.
+
+4. bazel build
+```
+bazel build -c opt --copt=-DARM_NON_MOBILE \
+    --copt="-fPIC" \
+    --copt="-march=armv7-a" \
+    --copt="-mfloat-abi=softfp" \
+    --copt="-mfpu=neon-vfpv4" \
+    --copt="-Wno-unused-function" \
+    --copt="-Wno-sign-compare" \
+    --copt="-ftree-vectorize" \
+    --copt="-fomit-frame-pointer" \
+    --copt="-mno-unaligned-access" \
+    --copt="-fno-aggressive-loop-optimizations" \
+    --cxxopt="-Wno-maybe-uninitialized" \
+    --cxxopt="-Wno-narrowing" \
+    --cxxopt="-Wno-unused" \
+    --cxxopt="-Wno-comment" \
+    --cxxopt="-Wno-unused-function" \
+    --cxxopt="-Wno-sign-compare" \
+    --cxxopt="-mfloat-abi=softfp" \
+    --cxxopt="-mfpu=neon-vfpv4" \
+    --cxxopt="-mno-unaligned-access" \
+    --cxxopt="-fno-aggressive-loop-optimizations" \
+    --linkopt="-mfloat-abi=softfp" \
+    --linkopt="-mfpu=neon-vfpv4" \
+    --linkopt="-mno-unaligned-access" \
+    --linkopt="-fno-aggressive-loop-optimizations" \
+    --verbose_failures \
+    --conlyopt="-std=c99" \
+    --crosstool_top=//local_arm_compiler:toolchain \
+    --cpu=armv7-a \
+    --config=opt \
+    //tensorflow/tools/pip_package:build_pip_package
+```
 
 However, some external packages(grpc,boringssl) may still throw error during compilation. But they are easy to repair.  
 And above steps don't gurantee that you can get everything done with one try. You still need basic cross compilation experiences.
