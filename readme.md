@@ -1,4 +1,4 @@
-# cross-compile tensorflow use hisilicon hisiv400 toolchain. 
+# cross-compile tensorflow with hisilicon hisiv400 toolchain. 
 # 使用海思hisiv400工具链交叉编译tensorflow
 
 ### Basic info
